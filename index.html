@@ -80,6 +80,33 @@
                         <label class="block text-sm font-medium text-gray-600 mb-1">Kasir</label>
                         <input type="text" id="cashierName" value="Admin" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">No. Struk</label>
+                        <input type="text" id="receiptNo" value="INV-001" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Logo Toko (Opsional)</label>
+                        <input type="file" id="storeLogo" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition">
+                        <button id="removeLogoBtn" class="hidden mt-1 text-xs text-red-500 hover:text-red-700 cursor-pointer transition"><i class="fa-solid fa-xmark"></i> Hapus Logo</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Gaya Nama Toko</label>
+                        <div class="flex gap-4 p-2 bg-gray-50 border border-gray-200 rounded-md h-[42px] items-center">
+                            <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="storeBold" checked class="rounded text-blue-600 focus:ring-blue-500"> Tebal</label>
+                            <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="storeLarge" class="rounded text-blue-600 focus:ring-blue-500"> Besar</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Ukuran Kertas</label>
+                        <select id="paperSize" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white">
+                            <option value="32">58mm (Kecil)</option>
+                            <option value="48">80mm (Besar)</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Catatan Bawah Struk</label>
+                        <input type="text" id="footerText" value="Terima Kasih Atas Kunjungan Anda" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                    </div>
                 </div>
             </div>
 
@@ -130,7 +157,21 @@
 
                 <!-- Pembayaran -->
                 <div class="mt-4 pt-4 border-t border-gray-200">
-                    <div class="flex justify-between items-center mb-3">
+                    <div class="flex justify-between items-center text-sm text-gray-600 mb-2">
+                        <span class="font-medium">Subtotal:</span>
+                        <span id="subtotalDisplay" class="font-semibold text-gray-800">Rp 0</span>
+                    </div>
+                    <div class="flex gap-4 mb-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Diskon (Rp)</label>
+                            <input type="number" id="discountAmount" value="0" min="0" class="w-full p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none transition text-sm">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Pajak / PPN (%)</label>
+                            <input type="number" id="taxPercent" value="0" min="0" class="w-full p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none transition text-sm">
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mb-3 pt-2 border-t border-gray-100">
                         <span class="text-lg font-bold text-gray-700">Total Tagihan:</span>
                         <span id="totalAmountDisplay" class="text-2xl font-bold text-blue-600">Rp 0</span>
                     </div>
@@ -170,7 +211,7 @@
             <div class="flex-1 p-6 bg-gray-200 overflow-y-auto flex justify-center items-start">
                 <div class="bg-white p-6 shadow-md w-[300px] min-h-[400px] struk-preview text-sm leading-tight border border-gray-300 relative" id="receiptPaper">
                     <!-- Preview konten akan dirender ke sini oleh JS -->
-                    <div id="previewContent" class="whitespace-pre-wrap break-words"></div>
+                    <div id="previewContent" class="break-words"></div>
                     <!-- Garis potong -->
                     <div class="absolute bottom-0 left-0 w-full border-t border-dashed border-gray-400 -mb-2"></div>
                 </div>
@@ -198,6 +239,7 @@
         let items = [];
         let total = 0;
         let connectionType = null; // 'serial' atau 'bluetooth'
+        let uploadedLogoImg = null; // Menyimpan data gambar logo
         
         // State Serial
         let port = null;
@@ -213,15 +255,25 @@
         const storeAddressInput = document.getElementById('storeAddress');
         const storePhoneInput = document.getElementById('storePhone');
         const cashierNameInput = document.getElementById('cashierName');
+        const receiptNoInput = document.getElementById('receiptNo');
+        const storeBoldCheckbox = document.getElementById('storeBold');
+        const storeLargeCheckbox = document.getElementById('storeLarge');
+        const paperSizeSelect = document.getElementById('paperSize');
+        const footerTextInput = document.getElementById('footerText');
+        const storeLogoInput = document.getElementById('storeLogo');
+        const removeLogoBtn = document.getElementById('removeLogoBtn');
         
         const itemForm = document.getElementById('itemForm');
         const itemNameInput = document.getElementById('itemName');
         const itemPriceInput = document.getElementById('itemPrice');
         const itemQtyInput = document.getElementById('itemQty');
+        const discountAmountInput = document.getElementById('discountAmount');
+        const taxPercentInput = document.getElementById('taxPercent');
         const cashAmountInput = document.getElementById('cashAmount');
         
         // Display
         const itemListTbody = document.getElementById('itemList');
+        const subtotalDisplay = document.getElementById('subtotalDisplay');
         const totalAmountDisplay = document.getElementById('totalAmountDisplay');
         const changeAmountDisplay = document.getElementById('changeAmountDisplay');
         const previewContent = document.getElementById('previewContent');
@@ -250,13 +302,19 @@
             BOLD_ON: [0x1B, 0x45, 0x01],
             BOLD_OFF: [0x1B, 0x45, 0x00],
             DOUBLE_HEIGHT: [0x1B, 0x21, 0x10],
-            NORMAL_SIZE: [0x1B, 0x21, 0x00],
+            DOUBLE_SIZE: [0x1D, 0x21, 0x11], // GS ! 11 (Besar/Double width & height)
+            NORMAL_SIZE: [0x1D, 0x21, 0x00], // GS ! 00 (Normal)
             CUT_PAPER: [0x1D, 0x56, 0x41, 0x10], // Partial cut
             NEW_LINE: [0x0A],
             LINE_SPACING_DEFAULT: [0x1B, 0x32]
         };
 
-        const MAX_CHARS_PER_LINE = 32; // Standard untuk printer 58mm (sesuaikan jika 80mm, biasanya 48)
+        let MAX_CHARS_PER_LINE = 32; // Default 58mm
+
+        // Buat nomor struk acak saat pertama dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            if(receiptNoInput) receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000);
+        });
 
         // --- FUNGSI HELPER UTILITY ---
         function formatRupiah(angka) {
@@ -334,13 +392,13 @@
         function updateUI() {
             // Update Tabel
             itemListTbody.innerHTML = '';
-            total = 0;
+            let rawSubtotal = 0;
 
             if (items.length === 0) {
                 itemListTbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400 italic">Belum ada barang ditambahkan.</td></tr>`;
             } else {
                 items.forEach((item, index) => {
-                    total += item.subtotal;
+                    rawSubtotal += item.subtotal;
                     const tr = document.createElement('tr');
                     tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                     tr.innerHTML = `
@@ -358,11 +416,20 @@
                 });
             }
 
-            // Update Total
-            totalAmountDisplay.textContent = formatRupiah(total);
-            calculateChange();
+            // Hitung Diskon & PPN
+            const discount = parseFloat(discountAmountInput.value) || 0;
+            const taxPercent = parseFloat(taxPercentInput.value) || 0;
             
-            // Update Preview
+            const afterDiscount = Math.max(0, rawSubtotal - discount);
+            const taxAmount = afterDiscount * (taxPercent / 100);
+            
+            total = afterDiscount + taxAmount;
+
+            // Update Tampilan Angka
+            if(subtotalDisplay) subtotalDisplay.textContent = formatRupiah(rawSubtotal);
+            totalAmountDisplay.textContent = formatRupiah(total);
+            
+            calculateChange();
             generatePreview();
         }
 
@@ -373,6 +440,8 @@
         }
 
         cashAmountInput.addEventListener('input', calculateChange);
+        discountAmountInput.addEventListener('input', updateUI);
+        taxPercentInput.addEventListener('input', updateUI);
 
         function calculateChange() {
             const cash = parseFloat(cashAmountInput.value) || 0;
@@ -396,46 +465,86 @@
 
         clearBtn.addEventListener('click', () => {
             if(items.length === 0) return;
-            // Gunakan konfirmasi bawaan browser untuk kemudahan (atau ganti modal custom jika diinginkan)
-            // Sesuai instruksi, kita TIDAK boleh pakai alert/confirm. Gunakan modal custom.
             items = [];
             cashAmountInput.value = '';
+            discountAmountInput.value = '0';
+            taxPercentInput.value = '0';
+            receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000); // Generate no baru otomatis
             updateUI();
             showMessage("Berhasil", "Data transaksi telah direset.", "success");
         });
 
-        // Event listener input toko untuk update preview realtime
-        [storeNameInput, storeAddressInput, storePhoneInput, cashierNameInput].forEach(input => {
-            input.addEventListener('input', generatePreview);
+        // Event listener input toko & pengaturan untuk update preview realtime
+        [storeNameInput, storeAddressInput, storePhoneInput, cashierNameInput, receiptNoInput, footerTextInput].forEach(input => {
+            if(input) input.addEventListener('input', generatePreview);
+        });
+        
+        [storeBoldCheckbox, storeLargeCheckbox].forEach(input => {
+            if(input) input.addEventListener('change', generatePreview);
+        });
+
+        // Event listener untuk Upload Logo
+        storeLogoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        uploadedLogoImg = img;
+                        removeLogoBtn.classList.remove('hidden');
+                        generatePreview();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Event listener untuk Hapus Logo
+        removeLogoBtn.addEventListener('click', function() {
+            storeLogoInput.value = '';
+            uploadedLogoImg = null;
+            removeLogoBtn.classList.add('hidden');
+            generatePreview();
+        });
+
+        paperSizeSelect.addEventListener('change', (e) => {
+            MAX_CHARS_PER_LINE = parseInt(e.target.value);
+            // Sesuaikan lebar wadah preview
+            const previewBox = document.getElementById('receiptPaper');
+            if(MAX_CHARS_PER_LINE === 48) {
+                previewBox.classList.replace('w-[300px]', 'w-[380px]'); // Lebarkan untuk 80mm
+            } else {
+                previewBox.classList.replace('w-[380px]', 'w-[300px]'); // Kembalikan ke 58mm
+            }
+            generatePreview();
         });
 
         // --- GENERATE PREVIEW TEKS & STRUKTUR CETAK ---
-        function buildReceiptText() {
-            const storeName = storeNameInput.value.trim() || 'Toko Anda';
-            const storeAddress = storeAddressInput.value.trim() || '-';
-            const storePhone = storePhoneInput.value.trim() || '-';
+        function getReceiptBodyText() {
             const cashier = cashierNameInput.value.trim() || 'Admin';
+            const receiptNo = receiptNoInput.value.trim() || '-';
+            const footerText = footerTextInput.value.trim() || 'Terima Kasih';
             
             const date = new Date();
             const dateStr = date.toLocaleDateString('id-ID');
             const timeStr = date.toLocaleTimeString('id-ID', { hour12: false });
+            
             const cash = parseFloat(cashAmountInput.value) || 0;
             const change = cash - total;
+            const discount = parseFloat(discountAmountInput.value) || 0;
+            const taxPercent = parseFloat(taxPercentInput.value) || 0;
+            
+            let rawSubtotal = 0;
+            items.forEach(i => rawSubtotal += i.subtotal);
+            const taxAmount = Math.max(0, rawSubtotal - discount) * (taxPercent / 100);
 
             let text = "";
-            
-            // Header
-            text += centerText(storeName) + "\n";
-            text += centerText(storeAddress) + "\n";
-            text += centerText(storePhone) + "\n";
-            text += createLine() + "\n";
-            
-            // Info Kasir & Waktu
             text += padSpace(`Tgl: ${dateStr}`, `Jam: ${timeStr}`) + "\n";
-            text += padSpace(`Kasir: ${cashier}`, "") + "\n";
+            text += padSpace(`No : ${receiptNo}`, `Ksr: ${cashier}`) + "\n";
             text += createLine() + "\n";
             
-            // Daftar Item
             items.forEach(item => {
                 text += item.name + "\n";
                 const qtyPrice = `${item.qty}x ${formatRupiah(item.price).replace('Rp', '')}`;
@@ -445,22 +554,54 @@
             
             text += createLine() + "\n";
             
-            // Pembayaran
+            if (discount > 0 || taxPercent > 0) {
+                text += padSpace("Subtotal:", formatRupiah(rawSubtotal).replace('Rp', '')) + "\n";
+                if (discount > 0) {
+                    text += padSpace("Diskon:", "-" + formatRupiah(discount).replace('Rp', '')) + "\n";
+                }
+                if (taxPercent > 0) {
+                    text += padSpace(`PPN (${taxPercent}%):`, formatRupiah(taxAmount).replace('Rp', '')) + "\n";
+                }
+                text += createLine() + "\n";
+            }
+            
             text += padSpace("TOTAL:", formatRupiah(total).replace('Rp', '')) + "\n";
             text += padSpace("TUNAI:", formatRupiah(cash).replace('Rp', '')) + "\n";
             text += padSpace("KEMBALI:", formatRupiah(change >= 0 ? change : 0).replace('Rp', '')) + "\n";
             
             text += createLine() + "\n";
-            text += centerText("Terima Kasih") + "\n";
-            text += centerText("Atas Kunjungan Anda") + "\n";
-            text += "\n\n"; // Ekstra space di bawah struk
+            text += centerText(footerText) + "\n";
+            text += "\n\n";
 
             return text;
         }
 
         function generatePreview() {
-            const text = buildReceiptText();
-            previewContent.textContent = text;
+            const storeName = storeNameInput.value.trim() || 'Toko Anda';
+            const storeAddress = storeAddressInput.value.trim() || '-';
+            const storePhone = storePhoneInput.value.trim() || '-';
+            
+            let nameStyle = "";
+            if (storeBoldCheckbox.checked) nameStyle += "font-weight: 900; ";
+            if (storeLargeCheckbox.checked) nameStyle += "font-size: 1.4rem; line-height: 1.2; transform: scaleX(1.1); transform-origin: center; margin-bottom: 4px; ";
+            
+            let html = `<div class="text-center w-full flex flex-col items-center">`;
+            
+            // Tambahkan logo ke preview jika ada
+            if (uploadedLogoImg) {
+                // Filter grayscale ditambahkan di CSS agar tampilan preview realistis mirip printer thermal
+                html += `<img src="${uploadedLogoImg.src}" style="max-width: ${MAX_CHARS_PER_LINE === 48 ? '220px' : '160px'}; filter: grayscale(100%) contrast(200%); margin-bottom: 8px;">`;
+            }
+            
+            html += `<div style="${nameStyle}">${storeName}</div>
+                <div>${storeAddress}</div>
+                <div>${storePhone}</div>
+                <div>${createLine()}</div>
+            </div>`;
+            
+            html += `<div class="whitespace-pre-wrap mt-1 w-full">${getReceiptBodyText()}</div>`;
+            
+            previewContent.innerHTML = html;
         }
 
         // --- WEB SERIAL API LOGIC (KONEKSI PRINTER USB/COM) ---
@@ -580,8 +721,75 @@
                 const chunk = new Uint8Array(dataArray.slice(i, i + chunkSize));
                 await bleCharacteristic.writeValue(chunk);
                 // Beri jeda sangat kecil agar buffer hardware printer murahan tidak penuh
-                await new Promise(resolve => setTimeout(resolve, 10)); 
+                await new Promise(resolve => setTimeout(resolve, 15)); 
             }
+        }
+
+        // --- FUNGSI KONVERSI GAMBAR KE ESC/POS RASTER (GS v 0) ---
+        function convertImageToESCPOS(img) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Tentukan lebar maksimum yang aman untuk printer (kelipatan 8)
+            // Printer 58mm biasanya sekitar 384 dots, 80mm sekitar 576 dots
+            const maxWidth = MAX_CHARS_PER_LINE === 48 ? 384 : 256; 
+            
+            let width = img.width;
+            let height = img.height;
+            
+            // Perkecil ukuran gambar jika melebihi batas maksimal agar printer tidak nge-hang
+            if (width > maxWidth) {
+                height = Math.round((maxWidth / width) * height);
+                width = maxWidth;
+            }
+            
+            // Lebar harus kelipatan 8 (syarat printer)
+            width = Math.floor(width / 8) * 8;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Gambar ke canvas dengan latar putih solid
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const pixels = imageData.data;
+            
+            const widthBytes = width / 8;
+            const rasterData = new Uint8Array(widthBytes * height);
+            
+            // Algoritma konversi piksel ke bit (Hitam/Putih)
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const r = pixels[idx];
+                    const g = pixels[idx + 1];
+                    const b = pixels[idx + 2];
+                    const a = pixels[idx + 3];
+                    
+                    // Hitung tingkat kecerahan (luminance)
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                    // Jika warna gelap dan tidak transparan, tandai sebagai titik hitam (1)
+                    const isBlack = (luminance < 128 && a > 128) ? 1 : 0;
+                    
+                    if (isBlack) {
+                        const byteIdx = y * widthBytes + Math.floor(x / 8);
+                        const bitIdx = 7 - (x % 8);
+                        rasterData[byteIdx] |= (1 << bitIdx); // Nyalakan bit untuk mencetak titik
+                    }
+                }
+            }
+            
+            // Header perintah ESC/POS GS v 0 (Print Raster Image)
+            const header = new Uint8Array([
+                0x1D, 0x76, 0x30, 0x00, 
+                widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
+                height & 0xFF, (height >> 8) & 0xFF
+            ]);
+            
+            return new Uint8Array([...header, ...rasterData]);
         }
 
         // --- FUNGSI CETAK KE PRINTER ---
@@ -605,20 +813,48 @@
             try {
                 // Kumpulkan semua data byte dalam satu array
                 let printData = [];
+                const addCmd = (cmd) => printData.push(...cmd);
+                const addText = (str) => printData.push(...encodeText(str));
                 
                 // 1. Inisialisasi
-                printData.push(...ESC_POS.INIT);
-                printData.push(...ESC_POS.ALIGN_CENTER);
-                
-                // 2. Ambil data teks
-                const receiptText = buildReceiptText();
-                printData.push(...encodeText(receiptText));
-                
-                // 3. Perintah Potong Kertas (beri spasi dulu)
-                for(let i=0; i<3; i++) printData.push(...ESC_POS.NEW_LINE);
-                printData.push(...ESC_POS.CUT_PAPER);
+                addCmd(ESC_POS.INIT);
+                addCmd(ESC_POS.ALIGN_CENTER);
 
-                // 4. Kirim data sesuai tipe koneksi
+                // 1.5 Cetak Logo Jika Ada
+                if (uploadedLogoImg) {
+                    try {
+                        const rasterImageCmd = convertImageToESCPOS(uploadedLogoImg);
+                        addCmd(rasterImageCmd);
+                        // Beri spasi enter sedikit setelah logo
+                        addCmd(ESC_POS.NEW_LINE); 
+                    } catch (e) {
+                        console.error("Gagal mengkonversi logo:", e);
+                    }
+                }
+                
+                // 2. Format Header Toko
+                if (storeBoldCheckbox.checked) addCmd(ESC_POS.BOLD_ON);
+                if (storeLargeCheckbox.checked) addCmd(ESC_POS.DOUBLE_SIZE);
+                
+                addText((storeNameInput.value.trim() || 'Toko Anda') + "\n");
+                
+                addCmd(ESC_POS.NORMAL_SIZE);
+                addCmd(ESC_POS.BOLD_OFF);
+                
+                addText((storeAddressInput.value.trim() || '-') + "\n");
+                addText((storePhoneInput.value.trim() || '-') + "\n");
+                addText(createLine() + "\n");
+                
+                addCmd(ESC_POS.ALIGN_LEFT);
+                
+                // 3. Body Struk (waktu, kasir, item, dll)
+                addText(getReceiptBodyText());
+                
+                // 4. Perintah Potong Kertas (beri spasi dulu)
+                for(let i=0; i<3; i++) addCmd(ESC_POS.NEW_LINE);
+                addCmd(ESC_POS.CUT_PAPER);
+
+                // 5. Kirim data sesuai tipe koneksi
                 if (connectionType === 'serial') {
                     await writer.write(new Uint8Array(printData));
                 } else if (connectionType === 'bluetooth') {
