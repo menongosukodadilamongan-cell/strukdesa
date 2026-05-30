@@ -82,7 +82,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-1">No. Struk</label>
-                        <input type="text" id="receiptNo" value="INV-001" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-sm">
+                        <input type="text" id="receiptNo" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-sm">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-1">Logo Toko (Opsional)</label>
@@ -200,7 +200,7 @@
                     <button id="clearBtn" class="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition">
                         <i class="fa-solid fa-trash-can"></i> Reset
                     </button>
-                    <!-- Tombol cetak, akan diaktifkan jika printer terhubung atau mode simulasi -->
+                    <!-- Tombol cetak -->
                     <button id="printBtn" class="px-4 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded shadow-sm transition font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fa-solid fa-print"></i> Cetak Struk
                     </button>
@@ -239,7 +239,7 @@
         let items = [];
         let total = 0;
         let connectionType = null; // 'serial' atau 'bluetooth'
-        let uploadedLogoImg = null; // Menyimpan data gambar logo
+        let uploadedLogoImg = null; 
         
         // State Serial
         let port = null;
@@ -250,10 +250,6 @@
         let bleServer = null;
         let bleService = null;
         let bleCharacteristic = null;
-
-        // UUID umum printer thermal
-        const PRINT_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
-        const PRINT_CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
         // --- REFERENSI ELEMEN DOM ---
         // Form & Input
@@ -301,25 +297,24 @@
 
         // --- KONFIGURASI PRINTER THERMAL (ESC/POS COMMANDS) ---
         const ESC_POS = {
-            INIT: [0x1B, 0x40], // Initialize printer
+            INIT: [0x1B, 0x40], 
             ALIGN_LEFT: [0x1B, 0x61, 0x00],
             ALIGN_CENTER: [0x1B, 0x61, 0x01],
             ALIGN_RIGHT: [0x1B, 0x61, 0x02],
             BOLD_ON: [0x1B, 0x45, 0x01],
             BOLD_OFF: [0x1B, 0x45, 0x00],
             DOUBLE_HEIGHT: [0x1B, 0x21, 0x10],
-            DOUBLE_SIZE: [0x1D, 0x21, 0x11], // GS ! 11 (Besar/Double width & height)
-            NORMAL_SIZE: [0x1D, 0x21, 0x00], // GS ! 00 (Normal)
-            CUT_PAPER: [0x1D, 0x56, 0x41, 0x10], // Partial cut
+            DOUBLE_SIZE: [0x1D, 0x21, 0x11], 
+            NORMAL_SIZE: [0x1D, 0x21, 0x00], 
+            CUT_PAPER: [0x1D, 0x56, 0x41, 0x10], 
             NEW_LINE: [0x0A],
-            LINE_SPACING_DEFAULT: [0x1B, 0x32]
         };
 
         let MAX_CHARS_PER_LINE = 32; // Default 58mm
 
-        // Buat nomor struk acak saat pertama dimuat
         document.addEventListener('DOMContentLoaded', () => {
-            if(receiptNoInput) receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000);
+            receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000);
+            generatePreview();
         });
 
         // --- FUNGSI HELPER UTILITY ---
@@ -348,14 +343,11 @@
 
         closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
 
-        // Pad string untuk layout nota (kiri - spasi - kanan)
         function padSpace(leftStr, rightStr, totalLen = MAX_CHARS_PER_LINE) {
             let leftStrConv = String(leftStr);
             let rightStrConv = String(rightStr);
-            
             let spacesNeeded = totalLen - (leftStrConv.length + rightStrConv.length);
-            if (spacesNeeded < 1) spacesNeeded = 1; // Minimal 1 spasi
-            
+            if (spacesNeeded < 1) spacesNeeded = 1; 
             return leftStrConv + ' '.repeat(spacesNeeded) + rightStrConv;
         }
 
@@ -373,20 +365,15 @@
         // --- LOGIKA APLIKASI KASIR ---
         itemForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            
             const name = itemNameInput.value.trim();
             const price = parseFloat(itemPriceInput.value);
             const qty = parseInt(itemQtyInput.value);
 
-            if (!name || isNaN(price) || isNaN(qty) || price < 0 || qty < 1) {
-                showMessage("Input Tidak Valid", "Mohon periksa kembali input barang Anda.", "warning");
-                return;
-            }
+            if (!name || isNaN(price) || isNaN(qty) || price < 0 || qty < 1) return;
 
             const subtotal = price * qty;
             items.push({ id: Date.now(), name, price, qty, subtotal });
             
-            // Reset input form
             itemNameInput.value = '';
             itemPriceInput.value = '';
             itemQtyInput.value = '1';
@@ -396,7 +383,6 @@
         });
 
         function updateUI() {
-            // Update Tabel
             itemListTbody.innerHTML = '';
             let rawSubtotal = 0;
 
@@ -422,16 +408,13 @@
                 });
             }
 
-            // Hitung Diskon & PPN
             const discount = parseFloat(discountAmountInput.value) || 0;
             const taxPercent = parseFloat(taxPercentInput.value) || 0;
             
             const afterDiscount = Math.max(0, rawSubtotal - discount);
             const taxAmount = afterDiscount * (taxPercent / 100);
-            
             total = afterDiscount + taxAmount;
 
-            // Update Tampilan Angka
             if(subtotalDisplay) subtotalDisplay.textContent = formatRupiah(rawSubtotal);
             totalAmountDisplay.textContent = formatRupiah(total);
             
@@ -439,7 +422,6 @@
             generatePreview();
         }
 
-        // Ekspos fungsi ke window agar bisa dipanggil dari atribut onclick HTML
         window.removeItem = function(id) {
             items = items.filter(item => item.id !== id);
             updateUI();
@@ -455,32 +437,28 @@
                 const change = cash - total;
                 if (change >= 0) {
                     changeAmountDisplay.textContent = formatRupiah(change);
-                    changeAmountDisplay.classList.remove('text-red-500', 'text-gray-500');
-                    changeAmountDisplay.classList.add('text-green-600', 'font-bold');
+                    changeAmountDisplay.className = "w-full p-2 bg-gray-50 border border-gray-200 rounded-md text-lg text-green-600 font-bold h-[46px] flex items-center";
                 } else {
                     changeAmountDisplay.textContent = "Uang Kurang!";
-                    changeAmountDisplay.classList.remove('text-green-600', 'text-gray-500');
-                    changeAmountDisplay.classList.add('text-red-500', 'font-bold');
+                    changeAmountDisplay.className = "w-full p-2 bg-gray-50 border border-gray-200 rounded-md text-lg text-red-500 font-bold h-[46px] flex items-center";
                 }
             } else {
                 changeAmountDisplay.textContent = "-";
                 changeAmountDisplay.className = "w-full p-2 bg-gray-50 border border-gray-200 rounded-md text-lg font-semibold text-gray-500 h-[46px] flex items-center";
             }
-            generatePreview(); // Update preview saat uang dibayar berubah
+            generatePreview();
         }
 
         clearBtn.addEventListener('click', () => {
-            if(items.length === 0) return;
             items = [];
             cashAmountInput.value = '';
             discountAmountInput.value = '0';
             taxPercentInput.value = '0';
-            receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000); // Generate no baru otomatis
+            receiptNoInput.value = 'INV-' + Math.floor(1000 + Math.random() * 9000); 
             updateUI();
             showMessage("Berhasil", "Data transaksi telah direset.", "success");
         });
 
-        // Event listener input toko & pengaturan untuk update preview realtime
         [storeNameInput, storeAddressInput, storePhoneInput, cashierNameInput, receiptNoInput, footerTextInput].forEach(input => {
             if(input) input.addEventListener('input', generatePreview);
         });
@@ -489,7 +467,6 @@
             if(input) input.addEventListener('change', generatePreview);
         });
 
-        // Event listener untuk Upload Logo
         storeLogoInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -507,7 +484,6 @@
             }
         });
 
-        // Event listener untuk Hapus Logo
         removeLogoBtn.addEventListener('click', function() {
             storeLogoInput.value = '';
             uploadedLogoImg = null;
@@ -517,12 +493,11 @@
 
         paperSizeSelect.addEventListener('change', (e) => {
             MAX_CHARS_PER_LINE = parseInt(e.target.value);
-            // Sesuaikan lebar wadah preview
             const previewBox = document.getElementById('receiptPaper');
             if(MAX_CHARS_PER_LINE === 48) {
-                previewBox.classList.replace('w-[300px]', 'w-[380px]'); // Lebarkan untuk 80mm
+                previewBox.classList.replace('w-[300px]', 'w-[380px]'); 
             } else {
-                previewBox.classList.replace('w-[380px]', 'w-[300px]'); // Kembalikan ke 58mm
+                previewBox.classList.replace('w-[380px]', 'w-[300px]'); 
             }
             generatePreview();
         });
@@ -593,9 +568,7 @@
             
             let html = `<div class="text-center w-full flex flex-col items-center">`;
             
-            // Tambahkan logo ke preview jika ada
             if (uploadedLogoImg) {
-                // Filter grayscale ditambahkan di CSS agar tampilan preview realistis mirip printer thermal
                 html += `<img src="${uploadedLogoImg.src}" style="max-width: ${MAX_CHARS_PER_LINE === 48 ? '220px' : '160px'}; filter: grayscale(100%) contrast(200%); margin-bottom: 8px;">`;
             }
             
@@ -611,21 +584,12 @@
         }
 
         // --- WEB SERIAL API LOGIC (KONEKSI PRINTER USB/COM) ---
-        
-        // Cek dukungan Web Serial API
-        if (!('serial' in navigator)) {
-            connectSerialBtn.style.display = 'none';
-        }
+        if (!('serial' in navigator)) connectSerialBtn.style.display = 'none';
+        if (!('bluetooth' in navigator)) connectBleBtn.style.display = 'none';
 
-        // Cek dukungan Web Bluetooth API
-        if (!('bluetooth' in navigator)) {
-            connectBleBtn.style.display = 'none';
-        }
-
-        // Fungsi untuk Encode Teks ke Uint8Array
         function encodeText(text) {
             const encoder = new TextEncoder();
-            return Array.from(encoder.encode(text)); // Jadikan array biasa agar mudah digabung
+            return Array.from(encoder.encode(text)); 
         }
 
         connectSerialBtn.addEventListener('click', async () => {
@@ -635,10 +599,8 @@
                 writer = port.writable.getWriter();
                 
                 connectionType = 'serial';
-                
                 statusBanner.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm flex items-center gap-2';
                 statusText.textContent = 'Terhubung via USB/Serial Port.';
-                
                 connectSerialBtn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Serial OK';
                 connectSerialBtn.classList.replace('text-blue-600', 'text-green-600');
             } catch (err) {
@@ -646,47 +608,58 @@
             }
         });
 
+        // --- ALGORITMA BLUETOOTH SAPU JAGAT (UNIVERSAL DISCOVERY) ---
         connectBleBtn.addEventListener('click', async () => {
             try {
-                if (!navigator.bluetooth) {
-                    throw new Error("Web Bluetooth API tidak didukung di browser ini. Gunakan Chrome/Edge di desktop atau Chrome di Android.");
-                }
+                if (!navigator.bluetooth) throw new Error("Web Bluetooth API tidak didukung di browser ini.");
 
-                showMessage("Mencari Printer", "Silakan pilih printer Bluetooth Anda dari daftar...", "info");
+                showMessage("Mencari Printer", "Silakan izinkan pencarian dan pilih printer Anda dari daftar...", "info");
 
-                // UUID layanan umum untuk berbagai merek mini thermal printer BLE
+                // Daftar UUID yang umum dipakai printer kasir Tiongkok (termasuk VSC, Panda, Iware, EPOS)
                 const optionalServices = [
-                    '000018f0-0000-1000-8000-00805f9b34fb', 
+                    '000018f0-0000-1000-8000-00805f9b34fb', // Standard Thermal
                     'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-                    '0000fee7-0000-1000-8000-00805f9b34fb',
-                    '0000ffe0-0000-1000-8000-00805f9b34fb', // SPP over BLE
-                    '49535343-fe7d-4ae5-8fa9-9fafd205e455'
+                    '0000fee7-0000-1000-8000-00805f9b34fb', // WeChat BLE
+                    '0000ffe0-0000-1000-8000-00805f9b34fb', // SPP over BLE (Paling sering dipakai)
+                    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // IS1678
+                    '00001101-0000-1000-8000-00805f9b34fb'  // Classic Serial (Terkadang diekspos sebagai BLE)
                 ];
 
-                // Meminta perangkat (Tampilkan popup Bluetooth)
+                // Meminta SEMUA perangkat Bluetooth sekitar (Mode Sapu Jagat)
                 bleDevice = await navigator.bluetooth.requestDevice({
-                    // Metode 1: Cari yang punya layanan printer standar
-                    filters: [{ services: [PRINT_SERVICE_UUID] }],
-                    // Metode 2 (Cadangan): Jika metode 1 gagal, gunakan opsi acceptAllDevices
-                    // Tapi ini butuh optionalServices agar bisa diakses nanti.
-                    // acceptAllDevices: true,
-                    // optionalServices: optionalServices
+                    acceptAllDevices: true,
+                    optionalServices: optionalServices
                 });
 
-                showMessage("Menghubungkan", "Membangun koneksi dengan printer...", "info");
-
-                // Menghubungkan ke server GATT
+                showMessage("Menghubungkan", "Membangun koneksi dengan printer " + bleDevice.name + "...", "info");
                 bleServer = await bleDevice.gatt.connect();
                 
-                // Mendapatkan Layanan
-                bleService = await bleServer.getPrimaryService(PRINT_SERVICE_UUID);
+                // Mencari layanan yang cocok dari daftar yang kita punya
+                bleService = null;
+                for (const uuid of optionalServices) {
+                    try {
+                        bleService = await bleServer.getPrimaryService(uuid);
+                        if (bleService) break; // Berhenti mencari jika ketemu
+                    } catch (err) {
+                        // Lanjut cari UUID berikutnya
+                    }
+                }
+
+                if (!bleService) {
+                    throw new Error("Tidak menemukan jalur cetak pada perangkat ini. Apakah ini benar printer thermal?");
+                }
                 
-                // Mendapatkan Karakteristik (Endpoint untuk menulis data)
-                bleCharacteristic = await bleService.getCharacteristic(PRINT_CHARACTERISTIC_UUID);
+                // Mendapatkan Karakteristik (Endpoint) secara otomatis (tidak hardcoded)
+                const characteristics = await bleService.getCharacteristics();
+                // Cari yang punya properti write atau writeWithoutResponse
+                bleCharacteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+
+                if (!bleCharacteristic) {
+                    throw new Error("Printer menolak untuk menerima data (Tidak ada karakteristik 'write').");
+                }
 
                 connectionType = 'bluetooth';
                 
-                // Event listener jika terputus
                 bleDevice.addEventListener('gattserverdisconnected', () => {
                     connectionType = null;
                     bleDevice = null;
@@ -696,41 +669,43 @@
                     statusBanner.className = 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-sm flex items-center gap-2';
                     statusText.textContent = 'Terputus dari printer Bluetooth';
                     showMessage("Terputus", "Koneksi ke printer Bluetooth terputus.", "warning");
-                    
                     connectBleBtn.innerHTML = '<i class="fa-brands fa-bluetooth"></i> Bluetooth';
                     connectBleBtn.classList.replace('text-green-600', 'text-blue-600');
                 });
 
                 statusBanner.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm flex items-center gap-2';
                 statusText.textContent = `Terhubung (Bluetooth): ${bleDevice.name || 'Printer'}`;
-                
                 connectBleBtn.innerHTML = '<i class="fa-solid fa-check"></i> Ble OK';
                 connectBleBtn.classList.replace('text-blue-600', 'text-green-600');
-
                 showMessage("Berhasil", "Printer Bluetooth siap digunakan!", "success");
 
             } catch (err) {
                 console.error('Error Bluetooth:', err);
-                
-                // Pesan error spesifik jika dibatalkan user
                 if (err.name === 'NotFoundError') {
-                    showMessage("Dibatalkan", "Pemilihan printer dibatalkan atau tidak ada printer yang ditemukan.", "info");
+                    showMessage("Dibatalkan", "Pemilihan printer dibatalkan.", "info");
                 } else {
-                     showMessage("Gagal Bluetooth", err.message || "Pastikan Bluetooth dan Lokasi/GPS menyala. Coba hapus cache browser jika terus gagal.", "error");
+                     showMessage("Gagal Bluetooth", err.message || "Pastikan Bluetooth dan Lokasi/GPS menyala.", "error");
                 }
-                
                 connectionType = null;
             }
         });
 
         async function writeToBluetooth(dataArray) {
             if (!bleCharacteristic) throw new Error("Karakteristik Bluetooth tidak ditemukan.");
-            const chunkSize = 20; // Limit aman MTU BLE biasanya 20 bytes
+            
+            const chunkSize = 20; // Limit aman MTU BLE
             for (let i = 0; i < dataArray.length; i += chunkSize) {
                 const chunk = new Uint8Array(dataArray.slice(i, i + chunkSize));
-                await bleCharacteristic.writeValue(chunk);
-                // Beri jeda sangat kecil agar buffer hardware printer murahan tidak penuh
-                await new Promise(resolve => setTimeout(resolve, 15)); 
+                
+                // Menggunakan writeWithoutResponse jika printer mensupportnya (sangat umum di printer murah agar tidak hang)
+                if (bleCharacteristic.properties.writeWithoutResponse) {
+                    await bleCharacteristic.writeValueWithoutResponse(chunk);
+                } else {
+                    await bleCharacteristic.writeValue(chunk);
+                }
+                
+                // Jeda 20ms agar buffer printer tidak meluap
+                await new Promise(resolve => setTimeout(resolve, 20)); 
             }
         }
 
@@ -738,38 +713,29 @@
         function convertImageToESCPOS(img) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
-            // Tentukan lebar maksimum yang aman untuk printer (kelipatan 8)
-            // Printer 58mm biasanya sekitar 384 dots, 80mm sekitar 576 dots
             const maxWidth = MAX_CHARS_PER_LINE === 48 ? 384 : 256; 
             
             let width = img.width;
             let height = img.height;
             
-            // Perkecil ukuran gambar jika melebihi batas maksimal agar printer tidak nge-hang
             if (width > maxWidth) {
                 height = Math.round((maxWidth / width) * height);
                 width = maxWidth;
             }
             
-            // Lebar harus kelipatan 8 (syarat printer)
             width = Math.floor(width / 8) * 8;
-            
             canvas.width = width;
             canvas.height = height;
             
-            // Gambar ke canvas dengan latar putih solid
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
             
             const imageData = ctx.getImageData(0, 0, width, height);
             const pixels = imageData.data;
-            
             const widthBytes = width / 8;
             const rasterData = new Uint8Array(widthBytes * height);
             
-            // Algoritma konversi piksel ke bit (Hitam/Putih)
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const idx = (y * width + x) * 4;
@@ -778,20 +744,17 @@
                     const b = pixels[idx + 2];
                     const a = pixels[idx + 3];
                     
-                    // Hitung tingkat kecerahan (luminance)
                     const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-                    // Jika warna gelap dan tidak transparan, tandai sebagai titik hitam (1)
                     const isBlack = (luminance < 128 && a > 128) ? 1 : 0;
                     
                     if (isBlack) {
                         const byteIdx = y * widthBytes + Math.floor(x / 8);
                         const bitIdx = 7 - (x % 8);
-                        rasterData[byteIdx] |= (1 << bitIdx); // Nyalakan bit untuk mencetak titik
+                        rasterData[byteIdx] |= (1 << bitIdx); 
                     }
                 }
             }
             
-            // Header perintah ESC/POS GS v 0 (Print Raster Image)
             const header = new Uint8Array([
                 0x1D, 0x76, 0x30, 0x00, 
                 widthBytes & 0xFF, (widthBytes >> 8) & 0xFF,
@@ -820,28 +783,23 @@
             }
 
             try {
-                // Kumpulkan semua data byte dalam satu array
                 let printData = [];
                 const addCmd = (cmd) => printData.push(...cmd);
                 const addText = (str) => printData.push(...encodeText(str));
                 
-                // 1. Inisialisasi
                 addCmd(ESC_POS.INIT);
                 addCmd(ESC_POS.ALIGN_CENTER);
 
-                // 1.5 Cetak Logo Jika Ada
                 if (uploadedLogoImg) {
                     try {
                         const rasterImageCmd = convertImageToESCPOS(uploadedLogoImg);
                         addCmd(rasterImageCmd);
-                        // Beri spasi enter sedikit setelah logo
                         addCmd(ESC_POS.NEW_LINE); 
                     } catch (e) {
                         console.error("Gagal mengkonversi logo:", e);
                     }
                 }
                 
-                // 2. Format Header Toko
                 if (storeBoldCheckbox.checked) addCmd(ESC_POS.BOLD_ON);
                 if (storeLargeCheckbox.checked) addCmd(ESC_POS.DOUBLE_SIZE);
                 
@@ -855,15 +813,11 @@
                 addText(createLine() + "\n");
                 
                 addCmd(ESC_POS.ALIGN_LEFT);
-                
-                // 3. Body Struk (waktu, kasir, item, dll)
                 addText(getReceiptBodyText());
                 
-                // 4. Perintah Potong Kertas (beri spasi dulu)
                 for(let i=0; i<3; i++) addCmd(ESC_POS.NEW_LINE);
                 addCmd(ESC_POS.CUT_PAPER);
 
-                // 5. Kirim data sesuai tipe koneksi
                 if (connectionType === 'serial') {
                     await writer.write(new Uint8Array(printData));
                 } else if (connectionType === 'bluetooth') {
@@ -874,7 +828,7 @@
 
             } catch (err) {
                 console.error("Gagal mencetak:", err);
-                showMessage("Error Cetak", "Terjadi kesalahan saat mengirim data. Pastikan printer menyala dan kertas tersedia. Error: " + err.message, "error");
+                showMessage("Error Cetak", "Terjadi kesalahan saat mengirim data. Pastikan printer menyala. Error: " + err.message, "error");
             }
         });
 
