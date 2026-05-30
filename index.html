@@ -247,7 +247,13 @@
         
         // State Bluetooth
         let bleDevice = null;
+        let bleServer = null;
+        let bleService = null;
         let bleCharacteristic = null;
+
+        // UUID umum printer thermal
+        const PRINT_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
+        const PRINT_CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
         // --- REFERENSI ELEMEN DOM ---
         // Form & Input
@@ -629,7 +635,9 @@
                 writer = port.writable.getWriter();
                 
                 connectionType = 'serial';
-                updateStatus(true, "Terhubung via USB/Serial Port.");
+                
+                statusBanner.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm flex items-center gap-2';
+                statusText.textContent = 'Terhubung via USB/Serial Port.';
                 
                 connectSerialBtn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Serial OK';
                 connectSerialBtn.classList.replace('text-blue-600', 'text-green-600');
@@ -640,6 +648,12 @@
 
         connectBleBtn.addEventListener('click', async () => {
             try {
+                if (!navigator.bluetooth) {
+                    throw new Error("Web Bluetooth API tidak didukung di browser ini. Gunakan Chrome/Edge di desktop atau Chrome di Android.");
+                }
+
+                showMessage("Mencari Printer", "Silakan pilih printer Bluetooth Anda dari daftar...", "info");
+
                 // UUID layanan umum untuk berbagai merek mini thermal printer BLE
                 const optionalServices = [
                     '000018f0-0000-1000-8000-00805f9b34fb', 
@@ -649,73 +663,68 @@
                     '49535343-fe7d-4ae5-8fa9-9fafd205e455'
                 ];
 
+                // Meminta perangkat (Tampilkan popup Bluetooth)
                 bleDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: optionalServices
+                    // Metode 1: Cari yang punya layanan printer standar
+                    filters: [{ services: [PRINT_SERVICE_UUID] }],
+                    // Metode 2 (Cadangan): Jika metode 1 gagal, gunakan opsi acceptAllDevices
+                    // Tapi ini butuh optionalServices agar bisa diakses nanti.
+                    // acceptAllDevices: true,
+                    // optionalServices: optionalServices
                 });
 
-                const server = await bleDevice.gatt.connect();
+                showMessage("Menghubungkan", "Membangun koneksi dengan printer...", "info");
+
+                // Menghubungkan ke server GATT
+                bleServer = await bleDevice.gatt.connect();
                 
-                // Cari service dan characteristic yang bisa ditulisi
-                const services = await server.getPrimaryServices();
-                let foundCharacteristic = null;
+                // Mendapatkan Layanan
+                bleService = await bleServer.getPrimaryService(PRINT_SERVICE_UUID);
+                
+                // Mendapatkan Karakteristik (Endpoint untuk menulis data)
+                bleCharacteristic = await bleService.getCharacteristic(PRINT_CHARACTERISTIC_UUID);
 
-                for (const service of services) {
-                    const characteristics = await service.getCharacteristics();
-                    for (const char of characteristics) {
-                        if (char.properties.write || char.properties.writeWithoutResponse) {
-                            foundCharacteristic = char;
-                            break;
-                        }
-                    }
-                    if (foundCharacteristic) break;
-                }
-
-                if (!foundCharacteristic) {
-                    throw new Error("Tidak menemukan karakteristik Bluetooth yang bisa ditulisi pada perangkat ini.");
-                }
-
-                bleCharacteristic = foundCharacteristic;
                 connectionType = 'bluetooth';
                 
-                updateStatus(true, "Terhubung via Bluetooth BLE (" + bleDevice.name + ").");
-                connectBleBtn.innerHTML = '<i class="fa-brands fa-bluetooth"></i> BT OK';
+                // Event listener jika terputus
+                bleDevice.addEventListener('gattserverdisconnected', () => {
+                    connectionType = null;
+                    bleDevice = null;
+                    bleServer = null;
+                    bleService = null;
+                    bleCharacteristic = null;
+                    statusBanner.className = 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-sm flex items-center gap-2';
+                    statusText.textContent = 'Terputus dari printer Bluetooth';
+                    showMessage("Terputus", "Koneksi ke printer Bluetooth terputus.", "warning");
+                    
+                    connectBleBtn.innerHTML = '<i class="fa-brands fa-bluetooth"></i> Bluetooth';
+                    connectBleBtn.classList.replace('text-green-600', 'text-blue-600');
+                });
+
+                statusBanner.className = 'bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm flex items-center gap-2';
+                statusText.textContent = `Terhubung (Bluetooth): ${bleDevice.name || 'Printer'}`;
+                
+                connectBleBtn.innerHTML = '<i class="fa-solid fa-check"></i> Ble OK';
                 connectBleBtn.classList.replace('text-blue-600', 'text-green-600');
 
-                // Listener jika Bluetooth terputus
-                bleDevice.addEventListener('gattserverdisconnected', onDisconnect);
+                showMessage("Berhasil", "Printer Bluetooth siap digunakan!", "success");
 
             } catch (err) {
-                if (err.name !== 'NotFoundError') showMessage("Gagal Bluetooth", err.message, "error");
+                console.error('Error Bluetooth:', err);
+                
+                // Pesan error spesifik jika dibatalkan user
+                if (err.name === 'NotFoundError') {
+                    showMessage("Dibatalkan", "Pemilihan printer dibatalkan atau tidak ada printer yang ditemukan.", "info");
+                } else {
+                     showMessage("Gagal Bluetooth", err.message || "Pastikan Bluetooth dan Lokasi/GPS menyala. Coba hapus cache browser jika terus gagal.", "error");
+                }
+                
+                connectionType = null;
             }
         });
 
-        function updateStatus(isConnected, text) {
-            if (isConnected) {
-                statusBanner.className = "bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm flex items-center gap-2";
-            } else {
-                statusBanner.className = "bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-sm flex items-center gap-2";
-            }
-            statusText.textContent = text;
-        }
-
-        function onDisconnect() {
-            connectionType = null;
-            port = null;
-            writer = null;
-            bleDevice = null;
-            bleCharacteristic = null;
-            updateStatus(false, "Koneksi printer terputus.");
-            connectSerialBtn.innerHTML = '<i class="fa-brands fa-usb"></i> USB / COM';
-            connectSerialBtn.classList.replace('text-green-600', 'text-blue-600');
-            connectBleBtn.innerHTML = '<i class="fa-brands fa-bluetooth"></i> Bluetooth';
-            connectBleBtn.classList.replace('text-green-600', 'text-blue-600');
-        }
-
-        // Listen for disconnect events untuk Serial
-        navigator.serial?.addEventListener("disconnect", onDisconnect);
-
         async function writeToBluetooth(dataArray) {
+            if (!bleCharacteristic) throw new Error("Karakteristik Bluetooth tidak ditemukan.");
             const chunkSize = 20; // Limit aman MTU BLE biasanya 20 bytes
             for (let i = 0; i < dataArray.length; i += chunkSize) {
                 const chunk = new Uint8Array(dataArray.slice(i, i + chunkSize));
